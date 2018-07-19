@@ -6,6 +6,7 @@ public class SendPositionOnUpdate : MonoBehaviour {
 
 	public OSC osc;
 
+
 	// Use this for initialization
 	void Start () {
 	
