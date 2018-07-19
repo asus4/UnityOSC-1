@@ -126,17 +126,30 @@ public class UDPPacketIO
     private UdpClient Sender;
     private UdpClient Receiver;
     private bool socketsOpen;
-    private string remoteHostName;
-    private int remotePort;
-    private int localPort;
+    private IPEndPoint remote;
+    private IPEndPoint local;
+    private IPAddress multicast = null;
 
 
-
-    public UDPPacketIO(string hostIP, int remotePort, int localPort)
+    public UDPPacketIO(string remoteIP, int remotePort, int localPort, string multicastIP = null)
     {
-        RemoteHostName = hostIP;
-        RemotePort = remotePort;
-        LocalPort = localPort;
+        IPAddress remoteAddr;
+        if (!IPAddress.TryParse(remoteIP, out remoteAddr))
+        {
+            Debug.LogErrorFormat("Can not parse Host IP: {0} ", remoteIP);
+            return;
+        }
+        remote = new IPEndPoint(remoteAddr, remotePort);
+        local = new IPEndPoint(IPAddress.Any, localPort);
+
+        if (!string.IsNullOrEmpty(multicastIP))
+        {
+            if (!IPAddress.TryParse(multicastIP, out multicast))
+            {
+                Debug.LogError("Can not parse Multicast IP");
+                multicast = null;
+            }
+        }
         socketsOpen = false;
     }
 
@@ -146,7 +159,7 @@ public class UDPPacketIO
         // latest time for this socket to be closed
         if (IsOpen())
         {
-            Debug.Log("closing udpclient listener on port " + localPort);
+            Debug.Log("closing udpclient listener on port " + local.Port);
             Close();
         }
 
@@ -162,19 +175,21 @@ public class UDPPacketIO
         try
         {
             Sender = new UdpClient();
-            Debug.Log("Opening OSC listener on port " + localPort);
+            Debug.Log("Opening OSC listener on port " + local.Port);
 
-            IPEndPoint listenerIp = new IPEndPoint(IPAddress.Any, localPort);
-            Receiver = new UdpClient(listenerIp);
-
-
+            Receiver = new UdpClient(local);
+            if (multicast != null)
+            {
+                Debug.LogFormat("Joinnin multicast: {0}", multicast);
+                Receiver.JoinMulticastGroup(multicast);
+            }
             socketsOpen = true;
 
             return true;
         }
         catch (Exception e)
         {
-            Debug.LogWarning("cannot open udp client interface at port " + localPort);
+            Debug.LogWarning("cannot open udp client interface at port " + local.Port);
             Debug.LogWarning(e);
         }
 
@@ -225,7 +240,7 @@ public class UDPPacketIO
         if (!IsOpen())
             return;
 
-        Sender.Send(packet, length, remoteHostName, remotePort);
+        Sender.Send(packet, length, remote);
         //Debug.Log("osc message sent to "+remoteHostName+" port "+remotePort+" len="+length);
     }
 
@@ -241,61 +256,24 @@ public class UDPPacketIO
         if (!IsOpen())
             return 0;
 
-
-        IPEndPoint iep = new IPEndPoint(IPAddress.Any, localPort);
-        byte[] incoming = Receiver.Receive(ref iep);
+        byte[] incoming = Receiver.Receive(ref local);
         int count = Math.Min(buffer.Length, incoming.Length);
         System.Array.Copy(incoming, buffer, count);
         return count;
-
-
     }
 
 
 
     /// <summary>
-    /// The address of the board that you're sending to.
+    /// Get the address is multicast of not
     /// </summary>
-    public string RemoteHostName
+    /// <param name="addr">the address</param>
+    /// <returns>multicast address or not</returns>
+    static bool IsMulticastAddress(IPAddress addr)
     {
-        get
-        {
-            return remoteHostName;
-        }
-        set
-        {
-            remoteHostName = value;
-        }
-    }
-
-    /// <summary>
-    /// The remote port that you're sending to.
-    /// </summary>
-    public int RemotePort
-    {
-        get
-        {
-            return remotePort;
-        }
-        set
-        {
-            remotePort = value;
-        }
-    }
-
-    /// <summary>
-    /// The local port you're listening on.
-    /// </summary>
-    public int LocalPort
-    {
-        get
-        {
-            return localPort;
-        }
-        set
-        {
-            localPort = value;
-        }
+        // 224.0.0.0 - 239.255.255.255
+        byte[] bytes = addr.GetAddressBytes();
+        return (bytes[0] & 0xF0) == 0xE0;
     }
 }
 
@@ -403,10 +381,10 @@ public delegate void OscMessageHandler(OscMessage oscM);
 /// </summary>
 public class OSC : MonoBehaviour
 {
-
     public int inPort = 6969;
     public string outIP = "127.0.0.1";
     public int outPort = 6161;
+    public string multiCastIP = "";
 
     private UDPPacketIO OscPacketIO;
     Thread ReadThread;
@@ -444,7 +422,7 @@ public class OSC : MonoBehaviour
     {
         //print("Opening OSC listener on port " + inPort);
 
-        OscPacketIO = new UDPPacketIO(outIP, outPort, inPort);
+        OscPacketIO = new UDPPacketIO(outIP, outPort, inPort, multiCastIP);
         AddressTable = new Hashtable();
 
         messagesReceived = new ArrayList();
@@ -1026,5 +1004,7 @@ public class OSC : MonoBehaviour
         else
             return rawSize + (4 - pad);
     }
+
+
 }
 //}
