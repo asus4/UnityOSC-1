@@ -111,7 +111,7 @@ using UnityEngine;
 
 namespace UniOSC
 {
-    public delegate void OscMessageHandler(OscMessage oscM);
+
 
     /// <summary>
     /// The Osc class provides the methods required to send, receive, and manipulate OSC messages.
@@ -133,6 +133,8 @@ namespace UniOSC
     /// </summary>
     public class OSC : MonoBehaviour
     {
+        public delegate void OscMessageHandler(OscMessage oscM);
+
         public int inPort = 6969;
         public string outIP = "127.0.0.1";
         public int outPort = 6161;
