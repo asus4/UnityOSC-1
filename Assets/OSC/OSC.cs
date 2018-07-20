@@ -7,6 +7,7 @@
 using System;
 using System.IO;
 using System.Collections;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -331,7 +332,7 @@ namespace UniOSC
 
                             if (paused == false)
                             {
-                                ArrayList newMessages = OSC.PacketToOscMessages(buffer, length);
+                                List<OscMessage> newMessages = OSC.PacketToOscMessages(buffer, length);
                                 messagesReceived.AddRange(newMessages);
                             }
 
@@ -375,7 +376,7 @@ namespace UniOSC
         /// serializes them into a byte[] suitable for sending to the PacketExchange.
         /// </summary>
         /// <param name="oms">The OSC Message to send.</param>   
-        public void Send(ArrayList oms)
+        public void Send(IList<OscMessage> oms)
         {
             byte[] packet = new byte[1000];
             int length = OSC.OscMessagesToPacket(oms, packet, 1000);
@@ -480,9 +481,9 @@ namespace UniOSC
         /// <param name="packet">The packet to be parsed.</param>
         /// <param name="length">The length of the packet.</param>
         /// <returns>An ArrayList of OscMessages.</returns>
-        public static ArrayList PacketToOscMessages(byte[] packet, int length)
+        public static List<OscMessage> PacketToOscMessages(byte[] packet, int length)
         {
-            ArrayList messages = new ArrayList();
+            var messages = new List<OscMessage>();
             ExtractMessages(messages, packet, 0, length);
             return messages;
         }
@@ -490,15 +491,15 @@ namespace UniOSC
         /// <summary>
         /// Puts an array of OscMessages into a packet (byte[]).
         /// </summary>
-        /// <param name="messages">An ArrayList of OscMessages.</param>
+        /// <param name="messages">A List of OscMessages.</param>
         /// <param name="packet">An array of bytes to be populated with the OscMessages.</param>
         /// <param name="length">The size of the array of bytes.</param>
         /// <returns>The length of the packet</returns>
-        public static int OscMessagesToPacket(ArrayList messages, byte[] packet, int length)
+        public static int OscMessagesToPacket(IList<OscMessage> messages, byte[] packet, int length)
         {
             int index = 0;
             if (messages.Count == 1)
-                index = OscMessageToPacket((OscMessage)messages[0], packet, 0, length);
+                index = OscMessageToPacket(messages[0], packet, 0, length);
             else
             {
                 // Write the first bundle bit
@@ -611,7 +612,7 @@ namespace UniOSC
         /// <param name="start">The index of where to start looking in the packet.</param>
         /// <param name="length">The length of the packet.</param>
         /// <returns>The index after the last OscMessage read.</returns>
-        private static int ExtractMessages(ArrayList messages, byte[] packet, int start, int length)
+        private static int ExtractMessages(IList<OscMessage> messages, byte[] packet, int start, int length)
         {
             int index = start;
             switch ((char)packet[start])
@@ -646,7 +647,7 @@ namespace UniOSC
         /// <param name="start">The index of where to start looking in the packet.</param>
         /// <param name="length">The length of the packet.</param>
         /// <returns>The index after the OscMessage is read.</returns>
-        private static int ExtractMessage(ArrayList messages, byte[] packet, int start, int length)
+        private static int ExtractMessage(IList<OscMessage> messages, byte[] packet, int start, int length)
         {
             OscMessage oscM = new OscMessage();
             oscM.address = ExtractString(packet, start, length);
